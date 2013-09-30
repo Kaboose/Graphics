@@ -1,0 +1,130 @@
+//Variables to define the FOV, n, and f for the camera
+	var FOV = 32;
+	var n = 0.1;
+	var f = 3;
+	var changeCamera = false;
+
+function addText(text) {
+	messageArea.value += text + "\n";
+}
+
+function setupMenu()
+	{
+		var menuItemList = ["Default", "FOV", "Near", "Far"];
+		var m = document.getElementById("menu");
+		var option;
+		for (var i=0; i<menuItemList.length;i++)
+		{
+			option=document.createElement("option");
+			option.text = menuItemList[i];
+			m.add(option);
+		}
+	}
+
+function menuHandler()
+{
+	var m = document.getElementById("menu");
+	var id = m.selectedIndex;
+	var toChange = m.options[id].text;
+	changeCamera = true;
+	if (toChange == 'Default')
+	{
+		addText("Default settings reset!");
+		FOV = 32;
+		n = 0.9;
+		f = 2;
+	}
+	else if (toChange === 'FOV')
+	{
+		addText("FOV selected");
+		FOV = 64;
+		n = 0.1;
+		f = 3;
+	}
+	else if (toChange === 'Near')
+	{
+		addText("Near selected");
+		FOV = 32;
+		n = 0.5;
+		f = 3;
+	}
+	else if (toChange === 'Far')
+	{	
+		addText("Far selected");
+		FOV = 32;
+		n = 0.1;
+		f = 10;
+	}
+}
+
+function main(){
+	// ... global variables ...
+	var modelObject=cubeObject;
+	var canvas = null;
+	var gl = null;
+	var messageField = null;
+	function addMessage(message){
+		console.log(message);
+	}
+	setupMenu();
+	canvas = document.getElementById("myCanvas");
+	addMessage(((canvas)?"Canvas acquired":"Error: Can not acquire canvas"));
+	gl = getWebGLContext(canvas);
+	console.log("done");
+	
+	var N=[2, 2, 2]; // How many teapots along x, y and z
+	var angle=0;
+	var model = new RenderableModel(gl,modelObject);
+
+	var modelbounds = model.getBounds();
+
+	var delta = Math.max(
+	    modelbounds.max[0]-modelbounds.min[0],
+	    modelbounds.max[1]-modelbounds.min[1],
+		modelbounds.max[2]-modelbounds.min[2]
+		);
+	var center = [
+	    0.5*(modelbounds.max[0]+modelbounds.min[0]),
+	    0.5*(modelbounds.max[1]+modelbounds.min[1]),
+		0.5*(modelbounds.max[2]+modelbounds.min[2])
+	];
+	var sceneBounds={};
+	sceneBounds.min = [modelbounds.min[0],modelbounds.min[1],modelbounds.min[2]]; // clone
+	sceneBounds.max = [
+		modelbounds.min[0]+N[0]*delta,
+	    modelbounds.min[1]+N[1]*delta,
+		modelbounds.min[2]+N[2]*delta
+	];
+	var camera = new Camera(gl,sceneBounds,[0,1,0]);
+	var projMatrix = camera.getProjMatrix();
+	
+	function draw(){
+		//Change the camera attributes
+		if (changeCamera) {
+			camera.changeDepth(FOV, n, f);
+			projMatrix = camera.getProjMatrix();
+			changeCamera = false;
+		}
+		
+		gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+		var viewMatrix = camera.getRotatedViewMatrix(angle);
+		var modelMatrix=new Matrix4();
+		for (var z=0; z<N[2]; z++)
+			for (var y=0; y<N[1]; y++)
+				for (var x=0; x<N[0]; x++){
+					modelMatrix.setTranslate(x*delta, y*delta, z*delta)
+					           .translate(center[0],center[1],center[2])
+							   .rotate(angle*(x+y+z),0,1,1)
+							   .translate(-center[0],-center[1],-center[2]);
+					model.draw(projMatrix, viewMatrix, modelMatrix);
+				}
+		angle++; if (angle > 360) angle -= 360;
+		window.requestAnimationFrame(draw);
+	}
+
+	gl.clearColor(0,0,0,1);
+	gl.enable(gl.DEPTH_TEST);
+	
+	draw();
+	return 1;
+}
